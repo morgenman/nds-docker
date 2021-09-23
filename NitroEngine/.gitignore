@@ -1,0 +1,17 @@
+/lib
+### The build tree; cleaned and rebuilt
+
+**/build
+
+### NDS executables
+*.elf
+*.nds
+
+### Dependency files
+*.d
+
+### Object files
+*.o
+*.obj
+*.slo
+*.lo
