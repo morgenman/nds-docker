@@ -1,228 +1,48 @@
 #+STARTUP: showall
-#+TITLE: Emulating the Nintendo DS
+#+TITLE: NDS Development Environment
 
-* Introduction
-This document (and the associated Dockerfiles) describe how to use ~podman~ (Pod Manager) to construct and run /containers/ with the ARM cross-compiler toolchain (for building programs for the Nintendo DS on x86_64 hardware) and running the Desmume NDS emulator.
+I don't like podman, here's my take. 
 
-Either or both of these tasks can be run directly on the x86_64 machine if you directly install ~devkitpro~ or ~desmume~ for your given operating system (and, with ~devkitpro~, compiler).
+## To setup game dev environment: 
 
-* Containers: Getting Started
-A /container/ is (at least very close to) a *virtual machine*. A virtual machine is a program that pretends to be a hardware computer. Opening an operating system with the virtual machine runs the OS on the virtualized hardware which may or may not be the same as the host hardware. Because virutalizing all of the hardware in software that is running atop an OS and physical hardware is slow, containers lighten the load by permitting closer sharing of host and guest resources.
+### Install W(indows)S(ubsystem)(for)L(inux)2: 
+> if you don't have it installed, simply open cmd/powershell and run: `wsl --install`
+> if you have WSL2 installed, skip this step
+> if you have WSL1 (old), DM me. 
+> to check your version, type `wsl -l -v` into cmd/powershell
 
-** The Pod Manager
-~podman~ is the user-facing program in an open-source collection of container tools. It is built to be (largely) plug-compatible with Docker (the container tool with first-mover market share).
+### Install docker:
+> https://docs.docker.com/desktop/windows/install/
+> Just install it, it should automatically integrate with wsl2
 
-Installing ~podman~ is operating system dependent. See [[https:podman.io]] for full documentation with installation instructions inside the "Getting Started" menu entry on the left.
+### Install VSCode:
+> I would be surprised if you didn't already have this installed
+> https://code.visualstudio.com/
 
-* Communicating with a Container
-If the container is running a whole new operating system, how do we communicate between the host (operating system running ~podman~) and the guest (operating system running within the ~podman~ container)?
+### Clone this Repository:
+> https://github.com/morgenman/nds-docker.git
+> Clone this repository, then delete the `.git` folder. (Not the `git` folder, leave that)
 
-The answers are: networks or shared file systems. Since we are using containers to build executables using a compiler or running the resulting programs, sharing a subdirectory from the host (where you will edit your source code and copy your sound/image assets) into the container. This is also the easiest for using other tools (such as version control) on the host to support NDS game development.
+### Open Workspace from Repository:
+> Open `nds-workspace.code-workspace` from the folder you just cloned in vscode
+> It *should* suggest you install the docker and remote code extensions. 
+> If it doesn't, you need these extensions: 
+> https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers
+> https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-docker
+> Once installed, it will probably suggest that you connect to the docker file. Do so. 
+> If it doesn't, click the >< symbol in the bottom left of the window and click `Reopen in Container`
+> If it has a second popup, click load from dockerfile. 
+> It could take a bit to build the docker image
 
-In Unix parlance, a /file system/ is a formatted "device". There is a root file system when a Unix-based OS boots. Other file systems can be /mounted/ into the root. What happens is that the OS opens the device and, if it is compatible, it replaces the contents of some subtree in the root file system with the base directory of the mounted device.
+### Build your code:
+> At this point, your vscode window should be all setup and the bottom left corner should say something like:
+> `Dev Container: Existing Dockerfile`
+> Click terminal at the top -> new terminal. 
+> You are in the root directory of the folder you cloned. Type in `cd hello_world`
+> Type `make clean`
+> Type `make`
+> It should build an NDS file!
+> You can copy the hello world folder into the git folder and make git repositories there. 
+> The NDS file will run in DeSuMe. If you need help installing that and running the nds file, let me know and I'll explain. 
 
-For example, this root file system has some binary (executable) files in ~/bin~, a ~/usr~ folder that we are not looking at, and a directory called ~/data~ that happens to be empty.
-
-#+BEGIN_SRC bash
-$ tree /
-/
-├── bin
-│   ├── ls
-│   ├── mount
-│   └── tree
-├── data
-└── usr
-...
-#+END_SRC
-
-If the device ~/dev/sdd1~ is a formatted partition with a ~src~ and ~build~ directory, we could mount it over the ~/data~ directory (note: ~mount~ usually takes extra parameters to work; this call with just the name of the device and mount point is for illustration purposes only.)
-
-#+BEGIN_SRC bash
-$ mount /dev/sdd1 /data
-... All Went Well ...
-$ tree /
-/
-├── bin
-│   ├── ls
-│   ├── mount
-│   └── tree
-├── data
-│   ├── build
-│   │   ├── game.o
-│   │   └── game
-│   └── source
-│       └── game.cpp
-└── usr
-...
-
-#+END_SRC
-
-The whole tree under ~/data~ is mapped into the file system from the device/partition. Note: if there was anything in the actual ~/data~ directory, it is shadowed by the mount and cannot be seen through that path until the device is unmounted.
-
-* Images/Containers
-An /image/ is to a /container/ as a /class/ is to an /object/. That is, the image, described in a ~Dockerfile~, is a static data file that has an operating system and all installed packages. When read by ~podman~, the image is used to start a running container, a virtual machine with the image's operating system running in it.
-
-Images, much like classes, can be based on (extend) other images. The relationship between images is described in a ~Dockerfile~. In the ~devkitpro~ and ~desmume~ directories in this repo are two ~Dockerfile~s, one for each image.
-
-** Build ~devkitpro~
-Building an image involves downloading the base image or images from a central repository, installing any specified software, and storing the image in the image collection maintained by ~podman~ on the host machine. The base image(s) and software to install are specified in a ~Dockerfile~.
-
- #+BEGIN_SRC bash
- $ cd devkitpro
- $ podman build . -t cis362/devkitpro
- #+END_SRC
-
-The ~Dockerfile~ is in the named folder so building the current directory lets it be found. The ~-t~ switch tags the image with a name that makes it easier to refer to in later commands.
-
-Much like ~git~, ~podman~ is the command in front of a large number of functions. Here ~podman build~ builds an image from the commandline or a ~Dockerfile~. Typing just ~podman~ will give you a quick list of all of the subcommands.
-
-*** Look at the new image
-
-#+BEGIN_SRC bash
-$ podman images
-  REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
-  docker.io/devkitpro/devkitarm  latest  136f4726f021  7 weeks ago  879 MB
-  localhost/cis362/devkitpro     latest  136f4726f021  7 weeks ago  879 MB
-#+END_SRC
-
-Two images are listed. The second repository name is ~localhost/cis362/devkitpro~; that is the tag we set on the commandline. Notice that the hexadecimal /IMAGE ID/ for the two images are the same. This is because the second one is just a local name (tag) for the first.
-
-*** Run ~bash~ inside the new image (optional)
-If you want to try out the image by running a command inside of it, you can run (anywhere on the host machine; ~podman~ put the image in a central repository on the box) the following:
-
-#+BEGIN_SRC bash
-$ podman run --rm \
-             --interactive \
-             --tty \
-              cis362/devkitpro /bin/bash
-#+END_SRC
-
-The back slashes mark continued lines. There is exactly one commandline specified in the above command.
-
-By default this container runs commands as /root/. This UID is mapped to the host user that ran ~podman~.
-
-Type 'Ctrl-D' or "exit" to leave the shell and terminate the container.
-
-** Mount host directories inside guest containers
-The compiler in ~cis362/devkitpro~ needs to compile source code on the host machine. This section will practice mapping directories across the host/guest border.
-
-Change directories to ~hello_world~ in this repository to run the following command.
-
-#+BEGIN_SRC bash
-$ podman run  --rm \
-              --interactive \
-              --tty \
-              --volume=$PWD:/source \
-              cis362/devkitpro /bin/bash
-
-  root:/ # dir /source
-  build/  hello_world.elf hello_world.nds  Makefile  source/
-  root:/ # exit
-$
-#+END_SRC
-
-Inside the container, a directory of ~/source~ shows the contents of the ~hello_world~ directory on the host. This is because ~$PWD~ (print working director) evaluates to the current directory in the commandline and the ~--volume~ command maps host directories to guest directories.
-
-Note that the code had been compiled before this sample was run. The ~elf~ and ~nds~ files are not part of the ~git~ repository.
-
-** Compiling ~hello_world.hds~
-The code in ~hello_wold/source/main.cpp~ is cribbed from the current version of ~devkitpro~.
-
-~hello_world~ directory contents in the repository:
-
-#+BEGIN_SRC dired
-hello_world
-├── Makefile
-└──  source
-    └── main.cpp
-#+END_SRC
-
-~main.cpp~ is an NDS version of the ubiquitous "Hello, World" program. It is in C++ and designed to run on the Nintendo DS when compiled and linked with the ~libnds~ library (included as part of ~devkitpro~).
-*** It must be compiled and linked for the *ARM* processor since the NDS has an ARM9 primary processor and an ARM7 secondary.
-
-The ~devkitpro~ image has the ~gcc~ compiler suite installed along with the /cross-compiler/ for ARM. Thus the compiler *runs* on your computer (probably an x86_64) but produces executables for the ARM.
-
-To avoid having to make this work on each of your machines, individually, they are pre-installed in the =cis362/devkitpro= image.
-
-** Run ~make~ inside a ~cis362/devkitpro~ container
-
-#+BEGIN_SRC bash
-$ podman run  --rm \
-              --interactive \
-              --tty \
-              --volume=$PWD:/source \
-              cis362/devkitpro make TARGET=hello_world
-#+END_SRC
-
-   - podman :: the base ~podman~ executable is being run
-   - run :: the ~podman~ subcommand to run some command inside of a built image
-   - --rm :: remove the running container when it terminates
-   - --interactive :: keep STDIN open even if not attached
-   - --tty :: attach a terminal to the container
-   - --user=$(id -u):$(id -g) :: define the user to run as inside the container; this makes the user inside the container equal to the user running this command (on the host machine). This means that files created inside the container but in directories in the host will have the right ownership (and you can delete them).
-   - --volume=$PWD:/source :: bind mount the /host/ directory before the ":" to the /container/ directory after the ":". $PWD evaluates to the current working directory (think "Print Working Directory"); /source is the working directory inside the container.
-   - cis362/devkitpro :: full name of the image to create a container from
-   - make TARGET=hello_world :: the command to run /inside/ the container. By default the =Makefile= uses the base name where it resides as the name of the executable target. Unfortunately, in ~podman~, this will always be =source=. To build a more usefully named executable, define a different name for the =TARGET= variable
-
-All in one easy to copy line:
-#+BEGIN_SRC bash
-$ podman run  --rm --interactive --tty --volume=$PWD:/source cis362/devkitpro make TARGET=hello_world
-#+END_SRC
-
-*** What does it actually do?
-- Spins up the ~cis362/devkitpro~ container
-- Switch to the /guest's/ ~/source~ directory (which is the current directory on the host).
-- Run, as /guest:root/ (host:you), ~make TARGET=hello_world~.
-  - Compile ~make.cpp~ (into ~build~ directory)
-  - Link ~hello_world.elf~ and then ~hello_world.nds~.
-
-** Build ~desmume~
-DeSmuME [[https://desmume.org/]] is crossplatform NDS emulator. Rather than install in on the lab boxes, a DeSmuME image will be created, running the emulator in a container. (Yes, a virtual DS inside a virtual PC; thank goodness modern machines are much faster than the NDS.)
-
-
-#+BEGIN_SRC bash
-$ cd desmume
-$ podman build . -t cis362/desmume
-... LOTS of output as it builds ...
-$ podman images
-REPOSITORY                     TAG     IMAGE ID      CREATED         SIZE
-localhost/cis362/desmume       latest  0ddc1f6afd2e  41 seconds ago  401 MB
-localhost/cis362/devkitpro     latest  0cb00f003d1d  22 minutes ago  889 MB
-docker.io/library/ubuntu       20.04   fb52e22af1b0  2 weeks ago     75.2 MB
-docker.io/devkitpro/devkitarm  latest  136f4726f021  7 weeks ago     879 MB
-#+END_SRC
-
-Both the ~devkitpro~ and ~desmume~ images are shown. They are each a tag on another image, each originally found in the DockeHub image repository.
-
-** Finally: Run ~hello_world.nds~
-
-#+BEGIN_SRC bash
-$ cd hello_world
-$ podman run  --rm \
-              --interactive \
-              --tty \
-              --volume=$PWD:/source \
-              --net=host \
-              --env="DISPLAY" \
-              --device /dev/snd \
-              --group-add audio \
-              laddbc/desmume /usr/games/desmume hello_world.nds
-#+END_SRC
-
-   - docker :: the base Docker executable is being run
-   - run :: the Docker subcommand to run some command inside of a built image
-   - --rm :: remove the running container when it terminates
-   - --interactive :: keep STDIN open even if not attached
-   - --tty :: attach a terminal to the container
-   - --user=$(id -u):$(id -g) :: define the user to run as inside the container; this makes the user inside the container equal to the user running this command (on the host machine). This means that files created inside the container but in directories in the host will have the right ownership (and you can delete them).
-   - --volume=$PWD:/source :: bind mount the /host/ directory before the ":" to the /container/ directory after the ":". $PWD evaluates to the current working directory (think "Print Working Directory"); /source is the working directory inside the container.
-   - --net=host :: connect the container's network to the host; necessary for XWindows to make a remote connection.
-   - --env="DISPLAY" :: copy the value of the =DISPLAY= environment variable and pass it into the container. Along with matching the user inside and out of the container, this permits the container's executables to connect to the local X server.
-   - --device /dev/snd :: connect the container's sound device to that on the host machine
-   - --group-add audio :: add the user (specified above with the --user command) to the audio group before running the command. Without this, the running program will not have access to the container's audio system.
-   - laddbc/desmume :: name of the image to run
-   - /usr/games/desmume hello_world.nds :: the command to execute inside the container: desmume is the emulator and if an NDS executable is specified, it is loaded and run.
-
-#+BEGIN_SRC bash
-$ docker run --rm --interactive --tty --user=$(id -u):$(id -g) --volume=$PWD:/source --net=host --env="DISPLAY" --device /dev/snd --group-add audio laddbc/desmume /usr/games/desmume hello_world.nds
-#+END_SRC
+Cheers!
