@@ -13,6 +13,7 @@ I don't like podman, here's my take.
 ### Install docker:  
 > https://docs.docker.com/desktop/windows/install/  
 > Just install it, it should automatically integrate with wsl2  
+> Leave Docker Desktop open and running so when you open Workspace, it can connect
   
 ### Install VSCode:  
 > I would be surprised if you didn't already have this installed  
