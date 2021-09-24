@@ -1,5 +1,4 @@
-#+STARTUP: showall
-#+TITLE: NDS Development Environment
+# NDS Development Environment
 
 I don't like podman, here's my take. 
 
