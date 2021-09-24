@@ -1,6 +1,7 @@
 # NDS Development Environment  
   
 I don't like podman, here's my take.  
+Example projects can be found in the NitroEngine Folder
   
 ## To setup game dev environment:   
    
